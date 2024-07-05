@@ -1,0 +1,435 @@
+---
+title: "Song_popularity"
+author: "Yi"
+date: "12/20/2022"
+output: pdf_document
+---
+
+```{r, echo = FALSE}
+library(tidyverse)
+library(ggplot2)
+library(car)
+
+r <- read.csv("song_data.csv", header = TRUE)
+
+# Store a copy of data
+data <- r %>%
+  filter(tempo > 0, tempo < 225, loudness < 0, song_popularity > 0) %>%
+  transform(song_popularity = as.numeric(song_popularity)) %>%
+  select(song_popularity, danceability, acousticness, energy, loudness, audio_valence, tempo)
+data
+
+```
+
+```{r Split into Training & Testing dataset}
+# first we will set our seed 
+set.seed(1234) # you can use any number here
+# the sample() function will let us take a random sample
+s <- sample(1:nrow(data), nrow(data) / 2, replace=F)
+# once we have the row numbers, we assign them to one of our datasets
+train <- data[s, ]
+# then we take all the remaining row numbers and assign them to the other set
+test <- data[-s,]
+# we can also download these dataset and/or save them as csv files for later
+# write.csv(train, file="final_train_data.csv")
+
+glimpse(train)
+```
+
+```{r}
+p1 <- ggplot(data, aes(x = danceability)) +
+    geom_histogram(color="black", fill="pink", bins = 25) + 
+  labs(
+      x = "Danceability",
+      y = "Count"
+    )
+
+p2 <- ggplot(data, aes(x = acousticness)) +
+  geom_histogram(color="black", fill="pink", bins = 25)+ 
+  labs(
+      x = "Acousticness",
+      y = "Count"
+    )
+
+p3 <- ggplot(data, aes(x = tempo)) +
+  geom_histogram(color="black", fill="pink", bins = 25) + 
+  labs(
+      x = "Tempo",
+      y = "Count"
+    )
+
+p4 <- ggplot(data, aes(x = audio_valence)) +
+  geom_histogram(color="black", fill="pink", bins = 25) + 
+  labs(
+      x = "Audio Valence",
+      y = "Count"
+    )
+
+p5 <- ggplot(data, aes(loudness)) +
+  geom_histogram(color="black", fill="pink", bins = 25) + 
+  labs(
+      x = "Loudness",
+      y = "Count"
+    )
+
+p6 <- ggplot(data, aes(energy)) +
+  geom_histogram(color="black", fill="pink", bins = 25) + 
+  labs(
+      x = "Energy",
+      y = "Count"
+    )
+
+p7 <- ggplot(data, aes(song_popularity)) +
+  geom_histogram(color = "black", fill = "pink", bins = 25) +
+  labs(
+      x = "Song Popularity",
+      y = "Count"
+  )
+
+grid.arrange(p1, p2, p3, p4, p5, p6, p7)
+```
+
+
+
+```{r}
+
+# check conditions for checking model assumptions
+full <- lm(song_popularity ~ ., data = train)
+summary(full)
+
+# check conditions for checking model assumptions
+
+pairs(train, gap = .4, cex.labels = .85)
+plot(train$song_popularity ~ fitted(full), main="Y vs Fitted", xlab="Fitted", ylab="Song Popularity")
+lines(lowess(train$song_popularity ~ fitted(full)), lty=2)
+abline(a = 0, b = 1)
+
+
+```
+
+
+
+According to the y and fitted y model, there is no discernible pattern, not violated.
+According to the pairwise scatterplot, it is no evidence of a non-linear relationship, so condition 2 is satisfied.
+
+```{r Check Assumptions}
+
+par(mfrow = c(3,3))
+plot(rstandard(full) ~ fitted(full), main = "Fitted vs Residuals", xlab = "Fitted", ylab = "Residuals")
+plot(rstandard(full) ~ train$danceability, main = "Residuals vs Danceability", xlab = "Danceability", ylab = "Residuals")
+plot(rstandard(full) ~ train$acousticness, main = "Residuals vs Acousticness", xlab = "Acousticness", ylab = "Residuals")
+plot(rstandard(full) ~ train$energy, main = "Residuals vs Energy", xlab = "Energy", ylab = "Residuals")
+plot(rstandard(full) ~ train$loudness, main = "Residuals vs Loudness", xlab = "Loudness", ylab = "Residuals")
+plot(rstandard(full) ~ train$audio_valence, main = "Residuals vs Audio Valence", xlab = "Audio Valence", ylab = "Residuals")
+plot(rstandard(full) ~ train$tempo, main = "Residuals vs Tempo", xlab = "Tempo", ylab = "Residuals")
+
+qqnorm(rstandard(full))
+qqline(rstandard(full))
+
+
+```
+
+According to the residual plot, we can verify our assumptions. 1: slightly negative linear. 2. 
+there is no discernible pattern in the uncorrelated errors. 3. error variance does seem a bit violated. 4. Slightly right skewed.
+
+Assumption 3 violated. 
+As the additional condition suggests loudness 
+
+It seems that loudness, energy, danceability, and y violate the condition 2
+
+
+Common Error variance: loudness, 
+
+```{r Cox-Box Transformations}
+
+temp_loudness <- train  %>%
+  mutate(loudness_ = abs(loudness)) %>%
+  glimpse()
+
+# Since all values of loudness are negative, I want to create a column that stores the positive values of it which helps later transformation
+
+p <- powerTransform(cbind(temp_loudness[, -c(3, 5, 6, 7)]))
+summary(p)
+```
+
+
+```{r Transformation Model}
+# Transform Variables 
+
+train$tsong_popularity <- train$song_popularity^(1.2)
+test$tsong_popularity <- test$song_popularity^(1.2)
+
+train$tdanceability <- train$danceability^(1.4)
+test$tdanceability <- test$danceability^(1.4)
+
+train$tenergy <- train$energy^(1.3)
+test$tenergy <- test$energy^(1.3)
+
+train$tloudness <- -(-train$loudness)^.2
+test$tloudness <- -(-test$loudness)^.2
+
+glimpse(train)
+# Create a transformed model
+
+# check conditions for checking model assumptions
+full2 <- lm(tsong_popularity ~ tdanceability + tloudness + tenergy + tempo + audio_valence + acousticness, data = train)
+summary(full2)
+
+# check conditions for checking model assumptions
+pairs(train[, -c(1, 2, 4, 5)], gap = .4, cex.labels = .85)
+plot(train$tsong_popularity ~ fitted(full2), main="Y vs Fitted", xlab="Fitted", ylab="Song Popularity")
+lines(lowess(train$tsong_popularity ~ fitted(full2)), lty=2)
+abline(a = 0, b = 1)
+```
+
+```{r Check Assumptionss}
+
+par(mfrow = c(3,3))
+plot(rstandard(full2) ~ fitted(full), main = "Fitted vs Residuals", xlab = "Fitted", ylab = "Residuals")
+plot(rstandard(full2) ~ train$tdanceability, main = "Residuals vs Danceability", xlab = "Danceability", ylab = "Residuals")
+plot(rstandard(full2) ~ train$acousticness, main = "Residuals vs Acousticness", xlab = "Acousticness", ylab = "Residuals")
+plot(rstandard(full2) ~ train$tenergy, main = "Residuals vs Energy", xlab = "Energy", ylab = "Residuals")
+plot(rstandard(full2) ~ train$tloudness, main = "Residuals vs Loudness", xlab = "Loudness", ylab = "Residuals")
+plot(rstandard(full2) ~ train$audio_valence, main = "Residuals vs Audio Valence", xlab = "Audio Valence", ylab = "Residuals")
+plot(rstandard(full2) ~ train$tempo, main = "Residuals vs Tempo", xlab = "Tempo", ylab = "Residuals")
+
+qqnorm(rstandard(full))
+qqline(rstandard(full))
+
+
+```
+
+
+
+
+
+```{r Outliers, Leverage Points and Influential Points}
+# Check for problematic points
+p1 <- length(coef(full2)) - 1
+n1 <- length(train$tsong_popularity)
+
+# Leverage Points
+h <- hatvalues(full2)
+length(which(as.character(hatvalues(full2)) > 2*(p1 + 1)/ n1))
+
+# Outliers 
+r <- rstandard(full2)
+length(which(rstandard(full2) < -4 | rstandard(full2) > 4)) # large dataset
+
+
+# Influential Points
+# Find the cooks distance and compare to cutoff 
+Dcutoff <- qf(.5, p1 + 1, n1 - p1 - 1)
+D <- cooks.distance(full2)
+length(which(D > Dcutoff))
+
+# Find the DFFITS and compare to cutoff
+DFFITScut <- 2 * sqrt((p1 + 1) / n1)
+dfs <- dffits(full2)
+length(which(abs(dfs) > DFFITScut))
+
+# Find the DFBETAS and compare to cutoff
+DFBETAcut <- 2 / sqrt(n1)
+length(which(abs(dfbetas(full2)) > 2*sqrt(1 / n1)))
+
+```
+
+```{r VIF}
+
+vif(full2)
+
+```
+
+
+```{r T test and F test}
+
+anova(full2)
+summary(full2)
+
+```
+
+```{r Refit a Reduced Model}
+model_reduced = lm(tsong_popularity ~ tdanceability + tloudness + tenergy + audio_valence + acousticness, data = train)
+```
+
+
+```{r}
+
+# check conditions for checking model assumptions
+reduced <- lm(tsong_popularity ~ tdanceability + acousticness + tenergy + tloudness + audio_valence, data = train)
+summary(reduced)
+
+# check conditions for checking model assumptions
+pairs(train[,-c(1, 2, 4, 5, 7)], gap = .4, cex.labels = .85)
+plot(train$tsong_popularity ~ fitted(reduced), main="Y vs Fitted", xlab="Fitted", ylab="Song Popularity")
+lines(lowess(train$tsong_popularity ~ fitted(reduced)), lty=2)
+abline(a = 0, b = 1)
+
+```
+
+
+
+```{r}
+
+par(mfrow = c(3,3))
+plot(rstandard(model_reduced) ~ fitted(model_reduced), main = "Fitted vs Residuals", xlab = "Fitted", ylab = "Residuals")
+plot(rstandard(model_reduced) ~ train$tdanceability, main = "Residuals vs Danceability", xlab = "Danceability", ylab = "Residuals")
+plot(rstandard(model_reduced) ~ train$acousticness, main = "Residuals vs Acousticness", xlab = "Acousticness", ylab = "Residuals")
+plot(rstandard(model_reduced) ~ train$tenergy, main = "Residuals vs Energy", xlab = "Energy", ylab = "Residuals")
+plot(rstandard(model_reduced) ~ train$tloudness, main = "Residuals vs Loudness", xlab = "Loudness", ylab = "Residuals")
+plot(rstandard(model_reduced) ~ train$audio_valence, main = "Residuals vs Audio Valence", xlab = "Audio Valence", ylab = "Residuals")
+
+qqnorm(rstandard(model_reduced))
+qqline(rstandard(model_reduced))
+
+```
+
+```{r Outliers, Leverage Points and INfluential Points_}
+# Check for problematic points
+p1 <- length(coef(model_reduced)) - 1
+n1 <- length(train$tsong_popularity)
+
+# Leverage Points
+h <- hatvalues(model_reduced)
+length(which(as.character(hatvalues(model_reduced)) > 2*(p1 + 1)/ n1))
+
+#Outliers 
+r <- rstandard(model_reduced)
+length(which(rstandard(model_reduced) < -4 | rstandard(model_reduced) > 4)) # large dataset
+
+
+# Influential Points
+# Find the cooks distance and compare to cutoff 
+Dcutoff <- qf(.5, p1 + 1, n1 - p1 - 1)
+D <- cooks.distance(model_reduced)
+length(which(D > Dcutoff))
+
+# Find the DFFITS and compare to cutoff
+DFFITScut <- 2 * sqrt((p1 + 1) / n1)
+dfs <- dffits(model_reduced)
+length(which(abs(dfs) > DFFITScut))
+
+# Find the DFBETAS and compare to cutoff
+DFBETAcut <- 2 / sqrt(n1)
+length(which(abs(dfbetas(model_reduced)) > 2*sqrt(1 / n1)))
+
+```
+
+
+
+```{r VIF_}
+
+vif(model_reduced)
+
+```
+
+
+
+
+```{r T test and F test_}
+
+anova(model_reduced)
+summary(model_reduced)
+
+```
+
+
+
+```{r Partial F test}
+
+anova(reduced, full2)
+
+```
+
+
+
+
+
+```{r Validate the reduced model with the testing dataset}
+test1 <- lm(tsong_popularity ~ tdanceability + tloudness + tenergy + audio_valence + acousticness, data = test)
+pairs(test, gap = .4, cex.labels = .85)
+plot(test$tsong_popularity ~ fitted(test1), main="Y vs Fitted", xlab="Fitted", ylab="Song Popularity")
+lines(lowess(test$tsong_popularity ~ fitted(test1)), lty=2)
+abline(a = 0, b = 1)
+
+par(mfrow = c(3,3))
+plot(rstandard(test1) ~ fitted(test1), main = "Fitted vs Residuals", xlab = "Fitted", ylab = "Residuals")
+plot(rstandard(test1) ~ train$tdanceability, main = "Residuals vs Danceability", xlab = "Danceability", ylab = "Residuals")
+plot(rstandard(test1) ~ train$acousticness, main = "Residuals vs Acousticness", xlab = "Acousticness", ylab = "Residuals")
+plot(rstandard(test1) ~ train$tenergy, main = "Residuals vs Energy", xlab = "Energy", ylab = "Residuals")
+plot(rstandard(test1) ~ train$tloudness, main = "Residuals vs Loudness", xlab = "Loudness", ylab = "Residuals")
+plot(rstandard(test1) ~ train$audio_valence, main = "Residuals vs Audio Valence", xlab = "Audio Valence", ylab = "Residuals")
+
+qqnorm(rstandard(test1))
+qqline(rstandard(test1))
+```
+
+
+```{r Outliers, Leverage Points and Influential Points__}
+# Check for problematic points
+pt <- length(coef(test1)) - 1
+nt <- length(train$tsong_popularity)
+
+# Leverage Points
+h <- hatvalues(test1)
+length(which(as.character(hatvalues(test1)) > 2*(pt + 1)/ nt))
+
+# Outliers 
+r <- rstandard(test1)
+length(which(rstandard(test1) < -4 | rstandard(test1) > 4)) # large dataset
+
+
+# Influential Points
+# Find the cooks distance and compare to cutoff 
+Dcutoff <- qf(.5, pt + 1, nt - pt - 1)
+D <- cooks.distance(test1)
+length(which(D > Dcutoff))
+
+# Find the DFFITS and compare to cutoff
+DFFITScut <- 2 * sqrt((pt + 1) / nt)
+dfs <- dffits(test1)
+length(which(abs(dfs) > DFFITScut))
+
+# Find the DFBETAS and compare to cutoff
+DFBETAcut <- 2 / sqrt(nt)
+length(which(abs(dfbetas(test1)) > 2*sqrt(1 / nt)))
+
+```
+
+```{r VIF__}
+
+vif(test1)
+
+```
+
+
+```{r}
+
+anova(test1)
+summary(test1)
+```
+
+
+
+```{r Get the Rsq_adj for the models}
+select = function(model, n) {
+  SSres <- sum(model$residuals^2)
+  Rsq <- summary(model)$r.squared
+  Rsq_adj <- summary(model)$adj.r.squared
+  p <- length(model$coefficients) - 1
+  AIC <- n*log(SSres/n) + 2*p     # you could also use AIC()
+  AICc <- AIC + (2*(p+2)*(p+3)/(n-p-1))
+  BIC <- n*log(SSres/n) + (p+2)*log(n)    # could also use BIC()
+  res <- c(SSres, Rsq, Rsq_adj, AIC, AICc, BIC)
+  names(res) <- c("SSres", "Rsq", "Rsq_adj", "AIC", "AIC_c", "BIC")
+  return(res) }
+# apply to the models
+s1 <- select(full2, nrow(data))
+s1
+s3 <- select(reduced, nrow(data))
+s3
+s4 <- select(test1, nrow(data))
+s4
+```
+
+

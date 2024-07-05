@@ -1,0 +1,169 @@
+---
+title: "Song_popularity"
+author: "Yi"
+date: "10/21/2022"
+output: pdf_document
+---
+
+```{r echo=FALSE}
+library(tidyverse)
+library(ggplot2)
+
+r <- read.csv("song_data.csv")
+
+# Store a copy of data
+rr <- r %>%
+  filter(tempo > 0, tempo < 225, loudness < 0) %>%
+  select(song_popularity, danceability, acousticness, energy, loudness, audio_valence, tempo)
+
+```
+
+
+
+```{r include=FALSE, eval=FALSE}
+
+# Scatter plots of the predictor vs. response
+p1 <- ggplot(rr, aes(x = danceability, y = song_popularity)) +
+    geom_point() + 
+  labs(
+      x = "Danceability",
+      y = "Song Popularity"
+    )
+
+p2 <- ggplot(rr, aes(acousticness, song_popularity)) +
+  geom_point()+ 
+  labs(
+      x = "Acousticness",
+      y = "Song Popularity"
+    )
+
+p3 <- ggplot(rr, aes(tempo, song_popularity)) +
+  geom_point() + 
+  labs(
+      x = "Tempo",
+      y = "Song Popularity"
+    )
+
+p4 <- ggplot(rr, aes(audio_valence, song_popularity)) +
+  geom_point() + 
+  labs(
+      x = "Audio Valence",
+      y = "Song Popularity"
+    )
+
+p5 <- ggplot(rr, aes(loudness, song_popularity)) +
+  geom_point() + 
+  labs(
+      x = "Loudness",
+      y = "Song Popularity"
+    )
+
+p6 <- ggplot(rr, aes(energy, song_popularity)) +
+  geom_point() + 
+  labs(
+      x = "Energy",
+      y = "Song Popularity"
+    )
+
+p1
+p2
+p3
+p4
+p5
+p6
+```
+
+
+```{r include=FALSE, echo=FALSE}
+
+# Histograms of the predictors vs. response
+
+h1 <- ggplot(r, aes(x = song_popularity)) +
+  geom_histogram(colour = 4, fill = "white", bins = 25) +
+  labs(x = "Song Popularity", y = "Counts")
+
+h2 <- ggplot(r, aes(x = danceability)) +
+  geom_histogram(colour = 4, fill = "white", bins = 25) +
+  labs(x = "Danceability", y = "Counts")
+
+h3 <- ggplot(r, aes(x = acousticness)) +
+  geom_histogram(colour = 4, fill = "white", bins = 25) +
+  labs(x = "Acousticness", y = "Counts")
+
+h4 <- ggplot(r, aes(x = tempo)) +
+  geom_histogram(colour = 4, fill = "white", bins = 25) +
+  labs(x = "Tempo", y = "Counts")
+
+h5 <- ggplot(r, aes(x = audio_valence)) +
+  geom_histogram(colour = 4, fill = "white", bins = 25) +
+  labs(x = "Audio Valence", y = "Counts")
+
+h6 <- ggplot(r, aes(x = loudness)) +
+  geom_histogram(colour = 4, fill = "white", bins = 25) +
+  labs(x = "Loudness", y = "Counts")
+
+h7 <- ggplot(r, aes(x = energy)) +
+  geom_histogram(colour = 4, fill = "white", bins = 25) +
+  labs(x = "Energy", y = "Counts")
+
+h1
+h2
+h3
+h4
+h5
+h6
+h7
+
+```
+
+
+```{r include=FALSE, echo=FALSE}
+
+r1 <- r %>%
+  filter(tempo > 0, tempo < 225, loudness < 0) %>%
+  select(song_popularity, danceability, acousticness, energy, loudness, audio_valence, tempo) %>%
+  summary()
+```
+
+
+
+
+Characteristics of variables
+
+| variable name | min | median | max | mean |
+|---------------|------|--------|----------|
+| `song_popularity`|0.00|56.00|100.00|53.00|
+| `danceability`|0.0594|0.6450|0.9870|0.6334|
+|`acousticness`|0.000001|0.133000|0.996000|0.258616|
+|`energy`|0.00107|0.67400|0.999900|0.64490|
+|`loudness`|-38.768|-6.557|-0.257|-7.450|
+|`audio_valence`|0.023|0.527|0.984|0.528|
+|`tempo`|46.59|120.01|216.12|121.07|
+
+
+
+Data Description
+
+| variable name |Description|
+|---------------|----------|
+|`danceability`|How suitable the track is for dancing with the range from 0.0 to 1.0|
+|`acousticness`|To tell if the track is acoustic or not with the confidence measure from 0.0 to 1.0|
+|`tempo`|The estimated pace of the track|
+|`audio_valence`|The musical positivity of the track with the range from 0.0 to 1.0|
+|`energy`|The intensity and activity of the track with the range from 0.0 to 1.0|
+|`loudness`|The measure of loudness of the track with the range from -60.0 to 0.0|
+|`song_popularity`|How popular the song is with the range from 0.0 to 100.0|
+
+
+Appendix
+
+```{r echo=FALSE}
+glimpse(rr)
+```
+
+
+
+
+
+
+
